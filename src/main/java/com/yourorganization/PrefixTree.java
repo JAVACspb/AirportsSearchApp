@@ -8,6 +8,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Префиксное дерево (Trie) для быстрого поиска строк по префиксу.
+ */
 public class PrefixTree {
     private static final Logger logger = LoggerFactory.getLogger(PrefixTree.class);
     private final Node root;
@@ -17,19 +20,26 @@ public class PrefixTree {
     }
 
     /**
-     * Метод для добавления строки в дерево с указанием номера строки.
+     * Добавляет слово в префиксное дерево с привязкой к номеру строки.
      *
      * @param word      слово для добавления
      * @param rowNumber номер строки
+     * @throws IllegalArgumentException если слово пустое или null
      */
     public void insert(String word, int rowNumber) {
+        if (word == null || word.isBlank()) {
+            throw new IllegalArgumentException("Слово не может быть null или пустым.");
+        }
+        if (rowNumber < 0) {
+            throw new IllegalArgumentException("Номер строки должен быть неотрицательным.");
+        }
+
         String normalizedWord = word.toLowerCase().trim();
         logger.debug("Добавляю слово в дерево: {}", normalizedWord);
 
         Node current = root;
         for (char c : normalizedWord.toCharArray()) {
             current = current.children.computeIfAbsent(c, k -> new Node());
-            // Добавляем номер строки на каждом уровне дерева
             if (!current.rowNumbers.contains(rowNumber)) {
                 current.rowNumbers.add(rowNumber);
             }
@@ -38,12 +48,17 @@ public class PrefixTree {
     }
 
     /**
-     * Метод для поиска по префиксу.
+     * Выполняет поиск строк по заданному префиксу.
      *
      * @param prefix префикс для поиска
      * @return список номеров строк, соответствующих префиксу
+     * @throws IllegalArgumentException если префикс пустой или null
      */
     public List<Integer> search(String prefix) {
+        if (prefix == null || prefix.isBlank()) {
+            throw new IllegalArgumentException("Префикс не может быть null или пустым.");
+        }
+
         String normalizedPrefix = prefix.toLowerCase().trim();
         logger.debug("Ищу префикс: {}", normalizedPrefix);
 
@@ -63,7 +78,7 @@ public class PrefixTree {
     }
 
     /**
-     * Внутренний класс для узла дерева.
+     * Внутренний класс, представляющий узел префиксного дерева.
      */
     private static class Node {
         private final Map<Character, Node> children = new HashMap<>();

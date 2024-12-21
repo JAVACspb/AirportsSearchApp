@@ -1,12 +1,16 @@
 {
-  "initTime" : 22,
+  "initTime" : 11,
   "result" : [ {
     "search" : "k",
     "result" : [ 9 ],
-    "time" : 0.239334
+    "time" : 0.109207
   }, {
     "search" : "d",
     "result" : [ ],
-    "time" : 0.134951
+    "time" : 0.149321
+  }, {
+    "search" : "п",
+    "result" : [ ],
+    "time" : 0.205711
   } ]
 }

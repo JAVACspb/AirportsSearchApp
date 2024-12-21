@@ -10,105 +10,125 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
 
 public class Main {
     private static final Logger logger = LoggerFactory.getLogger(Main.class);
 
     public static void main(String[] args) {
-        System.out.println("Приложение запущено");
-        System.out.println("Аргументы: " + Arrays.toString(args));
+        logger.info("Приложение запущено");
+        logger.info("Аргументы: {}", Arrays.toString(args));
+        logger.info("Текущая рабочая директория: {}", System.getProperty("user.dir"));
 
         long startTime = System.currentTimeMillis();
 
-        if (args.length < 8) {
-            logger.error("Неверное количество параметров. Пример использования:");
-            logger.error("--data airports.csv --indexed-column-id 2 --input-file input.txt --output-file output.json");
-            return;
-        }
-
-
-        String dataFile = args[1];
-        int columnId = Integer.parseInt(args[3]) - 1; // Преобразуем в индекс с 0
-        String inputFile = args[5];
-        String outputFile = args[7];
-
-        // Проверяем существование файлов
-        File dataFileCheck = new File(dataFile);
-        File inputFileCheck = new File(inputFile);
-
-        if (!dataFileCheck.exists()) {
-            System.err.println("Файл данных не найден: " + dataFile);
-            return;
-        }
-        if (!inputFileCheck.exists()) {
-            System.err.println("Файл с запросами не найден: " + inputFile);
-            return;
-        }
-
         try {
+            AppArguments appArgs = parseArguments(args);
+
+            File dataFile = new File(appArgs.dataFile());
+            File inputFile = new File(appArgs.inputFile());
+
+            // Проверяем существование файлов
+            validateFile(dataFile, "Файл данных не найден: ");
+            validateFile(inputFile, "Файл с запросами не найден: ");
+
             // Парсинг CSV
-            List<CsvParser.AirportRecord> records = CsvParser.parseCsv(dataFile, columnId);
+            List<CsvParser.AirportRecord> records = CsvParser.parseCsv(dataFile.getAbsolutePath(), appArgs.columnIndex());
             if (records.isEmpty()) {
-                logger.error("Файл данных не содержит подходящих записей.");
-                return;
+                throw new IllegalArgumentException("Файл данных не содержит подходящих записей.");
             }
 
-            PrefixTree prefixTree = new PrefixTree();
-
-            // Добавляем данные в дерево
-            for (CsvParser.AirportRecord record : records) {
-                logger.info("Добавляю в индекс: \"{}\" (строка {})", record.getSearchField(), record.getRowNumber());
-                prefixTree.insert(record.getSearchField(), record.getRowNumber());
-            }
-
-            logger.info("Индекс построен. Готов к выполнению поиска.");
-
-            // Чтение запросов
-            List<String> queries = Files.readAllLines(Paths.get(inputFile));
-            queries.removeIf(String::isBlank); // Удаляем пустые строки
-
-            if (queries.isEmpty()) {
-                logger.warn("Файл запросов пуст.");
-                return;
-            }
+            // Построение префиксного дерева
+            PrefixTree prefixTree = buildPrefixTree(records);
 
             // Выполнение поиска
+            List<String> queries = readQueries(appArgs.inputFile());
+            if (queries.isEmpty()) {
+                throw new IllegalArgumentException("Файл запросов пуст.");
+            }
+
             SearchService searchService = new SearchService(prefixTree);
             List<SearchService.SearchResult> results = searchService.search(queries);
 
-            // Формирование JSON-результата
+            // Сохранение результата
             long initTime = System.currentTimeMillis() - startTime;
-            ResultJson resultJson = new ResultJson(initTime, results);
+            saveResults(appArgs.outputFile(), initTime, results);
 
-            ObjectMapper mapper = new ObjectMapper();
-            mapper.writerWithDefaultPrettyPrinter().writeValue(Paths.get(outputFile).toFile(), resultJson);
-
-            logger.info("Результаты поиска сохранены в файл: {}", outputFile);
-
-        } catch (IOException e) {
-            logger.error("Ошибка: {}", e.getMessage(), e);
-        } catch (IllegalArgumentException e) {
-            logger.error("Неверные данные: {}", e.getMessage());
+        } catch (Exception e) {
+            logger.error("Ошибка выполнения программы: {}", e.getMessage(), e);
         }
-        System.out.println("Текущая рабочая директория: " + System.getProperty("user.dir"));
-
     }
 
-    private static class ResultJson {
-        private final long initTime;
-        private final List<SearchService.SearchResult> result;
-
-        public ResultJson(long initTime, List<SearchService.SearchResult> result) {
-            this.initTime = initTime;
-            this.result = result;
+    /**
+     * Разбирает аргументы командной строки.
+     */
+    private static AppArguments parseArguments(String[] args) {
+        if (args.length < 8) {
+            throw new IllegalArgumentException("""
+                Неверное количество параметров. Пример использования:
+                --data airports.csv --indexed-column-id 2 --input-file input.txt --output-file output.json
+                """);
         }
 
-        public long getInitTime() {
-            return initTime;
-        }
+        return new AppArguments(
+                args[1], // dataFile
+                Integer.parseInt(args[3]) - 1, // columnIndex (переводим в 0-индекс)
+                args[5], // inputFile
+                args[7]  // outputFile
+        );
+    }
 
-        public List<SearchService.SearchResult> getResult() {
-            return result;
+    /**
+     * Проверяет существование файла.
+     */
+    private static void validateFile(File file, String errorMessage) {
+        if (!file.exists() || !file.isFile()) {
+            throw new IllegalArgumentException(errorMessage + file.getAbsolutePath());
         }
+    }
+
+    /**
+     * Создаёт префиксное дерево из записей.
+     */
+    private static PrefixTree buildPrefixTree(List<CsvParser.AirportRecord> records) {
+        PrefixTree prefixTree = new PrefixTree();
+        for (CsvParser.AirportRecord record : records) {
+            logger.info("Добавляю в индекс: \"{}\" (строка {})", record.getSearchField(), record.getRowNumber());
+            prefixTree.insert(record.getSearchField(), record.getRowNumber());
+        }
+        logger.info("Индекс построен. Готов к выполнению поиска.");
+        return prefixTree;
+    }
+
+    /**
+     * Читает запросы из файла.
+     */
+    private static List<String> readQueries(String inputFile) throws IOException {
+        return Files.readAllLines(Paths.get(inputFile))
+                .stream()
+                .filter(line -> !line.isBlank())
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Сохраняет результаты поиска в файл.
+     */
+    private static void saveResults(String outputFile, long initTime, List<SearchService.SearchResult> results) throws IOException {
+        ResultJson resultJson = new ResultJson(initTime, results);
+        ObjectMapper mapper = new ObjectMapper();
+        mapper.writerWithDefaultPrettyPrinter().writeValue(Paths.get(outputFile).toFile(), resultJson);
+        logger.info("Результаты поиска сохранены в файл: {}", outputFile);
+    }
+
+    /**
+     * DTO для аргументов приложения.
+     */
+    private record AppArguments(String dataFile, int columnIndex, String inputFile, String outputFile) {
+    }
+
+    /**
+     * DTO для результата выполнения программы.
+     */
+    private record ResultJson(long initTime, List<SearchService.SearchResult> result) {
     }
 }
