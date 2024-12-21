@@ -21,9 +21,9 @@
 
 1. Убедитесь, что у вас установлен Maven.
 2. Выполните команду для сборки:
-   ```bash
-   mvn clean package
-   ```
+```bash
+  mvn clean package
+```
 После успешной сборки будет создан JAR файл в директории target.
 
 ## Запуск
@@ -37,7 +37,7 @@ java -Xmx7m -jar target/AirportsSearchApp-1.0-SNAPSHOT-jar-with-dependencies.jar
 ```
 
 ## Аргументы командной строки
-```
+```bash
 --data — путь к CSV-файлу с данными аэропортов.
 --indexed-column-id — номер колонки для поиска (начиная с 1).
 --input-file — путь к файлу с запросами.
