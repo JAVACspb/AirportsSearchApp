@@ -1,0 +1,12 @@
+{
+  "initTime" : 22,
+  "result" : [ {
+    "search" : "k",
+    "result" : [ 9 ],
+    "time" : 0.239334
+  }, {
+    "search" : "d",
+    "result" : [ ],
+    "time" : 0.134951
+  } ]
+}
